@@ -6,6 +6,11 @@ local images = {
 	pointer = lg.newImage("assets/pointer.png"),
 }
 
+local consts = {
+	mapWidth = 10,
+	mapHeight = 10,
+}
+
 local age = require("age")
 
 age.thing {
@@ -16,6 +21,7 @@ age.thing {
 	y = 0,
 	ox = 0,
 	oy = 0,
+	image = images.fixed,
 	layer = "bk",
 
 	reposition = function (e)
@@ -28,7 +34,7 @@ age.thing {
 	end,
 
 	system = function (e)
-		lg.draw(images.fixed, e.ox+e.x, e.oy+e.y)
+		lg.draw(e.image, e.ox+e.x, e.oy+e.y)
 	end,
 }
 
@@ -93,6 +99,37 @@ age.thing {
 		end
 	end,
 
+	fit = function (e, dx, dy)
+		for _, b in ipairs(e.blocks) do
+			local x, y = b[1], b[2]
+			if e.cx + x + dx < 1 or e.cy + y + dy < 1 or
+				e.cx + x + dx > consts.mapWidth or
+				e.cy + y + dy > consts.mapHeight then
+				return false
+			end
+		end
+		return true
+	end,
+
+	refit = function (e)
+		for _, b in ipairs(e.blocks) do
+			local x = b[1]
+			local y = b[2]
+			if e.cx + x < 1 then
+				e.cx = 1 - x
+			end
+			if e.cy + y < 1 then
+				e.cy = 1 - y
+			end
+			if e.cx + x > consts.mapWidth then
+				e.cx = consts.mapWidth - x
+			end
+			if e.cy + y > consts.mapHeight then
+				e.cy = consts.mapHeight - y
+			end
+		end
+	end,
+
 	handleButtons = function (e, dt)
 		local pressed, justPressed = {}, {}
 		for key, value in pairs(e.buttons) do
@@ -115,8 +152,10 @@ age.thing {
 			end
 			local dd = e.debounce[dir]
 			if pressed[dir] and dd >= e.debounceTimeout then
-				e.cx = e.cx + dx
-				e.cy = e.cy + dy
+				if e:fit(dx, dy) then
+					e.cx = e.cx + dx
+					e.cy = e.cy + dy
+				end
 				dd = 0
 			end
 			if not pressed[dir] then
@@ -130,6 +169,7 @@ age.thing {
 				for i, b in ipairs(e.blocks) do
 					e.blocks[i] = {b[2] * dx, b[1] * dy}
 				end
+				e:refit()
 			end
 		end
 
@@ -142,6 +182,7 @@ age.thing {
 		rotate("rotateRight", -1, 1)
 
 		if justPressed["drop"] then
+			age.message("placePiece", e.cx, e.cy, e.blocks)
 		end
 	end,
 
@@ -163,12 +204,12 @@ age.thing {
 
 age.thing {
 	name = "game-field",
-	width = 10,
-	height = 10,
-	x = (360 - 16*12) * 0.5,
-	y = (240 - 16*12) * 0.5,
+	width = consts.mapWidth,
+	height = consts.mapHeight,
+	x = (360 - 16*(consts.mapWidth+2)) * 0.5,
+	y = (240 - 16*(consts.mapHeight+2)) * 0.5,
 	map = {},
-	messages = {"playerOnline"},
+	messages = {"playerOnline", "placePiece"},
 
 	init = function (e)
 		for j=1, e.height do
@@ -198,6 +239,23 @@ age.thing {
 
 	playerOnline = function (e, id)
 		age.message("setOffset", id, e.x, e.y)
+	end,
+
+	placePiece = function (e, x, y, blocks)
+		for _, b in ipairs(blocks) do
+			local ox, oy = x+b[1], y+b[2]
+			local c = e.map[oy][ox]
+			if c == 0 then
+				e.map[oy][ox] = 1
+				age.entity("block", {
+					ox = e.x,
+					oy = e.y,
+					cx = ox,
+					cy = oy,
+					image = images.block,
+				})
+			end
+		end
 	end,
 }
 
