@@ -280,14 +280,17 @@ local function released(btn)
 	age.message("btnReleased", btn)
 end
 
-local function run()
+local function start()
 	age.play("play")
-	return {
-		pressed = pressed,
-		released = released,
-	}
+end
+
+local function update(dt)
+	age.update(dt)
 end
 
 return {
-	run = run,
+	start = start,
+	update = update,
+	pressed = pressed,
+	released = released,
 }
